@@ -1,12 +1,14 @@
 from __future__ import print_function
-from unicorn import *
-from unicorn.x86_const import *
-from unicorn.arm_const import *
-from unicorn.arm64_const import *
-from struct import unpack, pack, unpack_from, calcsize
+
+from struct import calcsize, pack, unpack, unpack_from
+
 from idaapi import get_func
-from idc import Qword, GetManyBytes, SelStart, SelEnd, here, ItemSize
 from idautils import XrefsTo
+from idc import GetManyBytes, ItemSize, Qword, SelEnd, SelStart, here
+from unicorn import *
+from unicorn.arm64_const import *
+from unicorn.arm_const import *
+from unicorn.x86_const import *
 
 PAGE_ALIGN = 0x1000  # 4k
 
@@ -57,13 +59,15 @@ class Emu(object):
 
     def _hook_code(self, uc, address, size, user_data):
         if self.traceOption & TRACE_CODE:
-            self._addTrace("### Trace Instruction at 0x%x, size = %u" % (address, size))
+            self._addTrace("### Trace Instruction at 0x%x, size = %u" %
+                           (address, size))
         if address in self.altFunc.keys():
             func, argc, balance = self.altFunc[address]
             try:
                 sp = uc.reg_read(self.REG_SP)
                 if self.REG_RA == 0:
-                    RA = unpack(self.pack_fmt, str(uc.mem_read(sp, self.step)))[0]
+                    RA = unpack(self.pack_fmt,
+                                str(uc.mem_read(sp, self.step)))[0]
                     sp += self.step
                 else:
                     RA = uc.reg_read(self.REG_RA)
@@ -75,7 +79,9 @@ class Emu(object):
                     i += 1
                 sp2 = sp
                 while i < argc:
-                    args.append(unpack(self.pack_fmt, str(uc.mem_read(sp2, self.step)))[0])
+                    args.append(
+                        unpack(self.pack_fmt, str(uc.mem_read(sp2, self.step)))
+                        [0])
                     sp2 += self.step
                     i += 1
 
@@ -98,7 +104,10 @@ class Emu(object):
         for offset in xrange(0, size, 64):
             tmp = GetManyBytes(address + offset, 64)
             if tmp == None:
-                res.extend([pack("<Q", Qword(address + offset + i)) for i in range(0, 64, 8)])
+                res.extend([
+                    pack("<Q", Qword(address + offset + i))
+                    for i in range(0, 64, 8)
+                ])
             else:
                 res.append(tmp)
         res = "".join(res)
@@ -130,10 +139,15 @@ class Emu(object):
                 self.REG_RA = 0
                 self.REG_RES = UC_X86_REG_RAX
                 if self.compiler == COMPILE_GCC:
-                    self.REG_ARGS = [UC_X86_REG_RDI, UC_X86_REG_RSI, UC_X86_REG_RDX, UC_X86_REG_RCX,
-                                     UC_X86_REG_R8, UC_X86_REG_R9]
+                    self.REG_ARGS = [
+                        UC_X86_REG_RDI, UC_X86_REG_RSI, UC_X86_REG_RDX,
+                        UC_X86_REG_RCX, UC_X86_REG_R8, UC_X86_REG_R9
+                    ]
                 elif self.compiler == COMPILE_MSVC:
-                    self.REG_ARGS = [UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9]
+                    self.REG_ARGS = [
+                        UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8,
+                        UC_X86_REG_R9
+                    ]
         elif self.arch == UC_ARCH_ARM:
             if self.mode == UC_MODE_ARM:
                 self.step = 4
@@ -145,7 +159,9 @@ class Emu(object):
             self.REG_SP = UC_ARM_REG_SP
             self.REG_RA = UC_ARM_REG_LR
             self.REG_RES = UC_ARM_REG_R0
-            self.REG_ARGS = [UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3]
+            self.REG_ARGS = [
+                UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3
+            ]
         elif self.arch == UC_ARCH_ARM64:
             self.step = 8
             self.pack_fmt = '<Q'
@@ -153,8 +169,11 @@ class Emu(object):
             self.REG_SP = UC_ARM64_REG_SP
             self.REG_RA = UC_ARM64_REG_LR
             self.REG_RES = UC_ARM64_REG_X0
-            self.REG_ARGS = [UC_ARM64_REG_X0, UC_ARM64_REG_X1, UC_ARM64_REG_X2, UC_ARM64_REG_X3,
-                             UC_ARM64_REG_X4, UC_ARM64_REG_X5, UC_ARM64_REG_X6, UC_ARM64_REG_X7]
+            self.REG_ARGS = [
+                UC_ARM64_REG_X0, UC_ARM64_REG_X1, UC_ARM64_REG_X2,
+                UC_ARM64_REG_X3, UC_ARM64_REG_X4, UC_ARM64_REG_X5,
+                UC_ARM64_REG_X6, UC_ARM64_REG_X7
+            ]
 
     def _initStackAndArgs(self, uc, RA, args):
         uc.mem_map(self.stack, (self.ssize + 1) * PAGE_ALIGN)
@@ -196,8 +215,10 @@ class Emu(object):
                 ip = uc.reg_read(UC_X86_REG_IP)
                 eflags = uc.reg_read(UC_X86_REG_EFLAGS)
 
-                print("    AX = 0x%x BX = 0x%x CX = 0x%x DX = 0x%x" % (ax, bx, cx, dx))
-                print("    DI = 0x%x SI = 0x%x BP = 0x%x SP = 0x%x" % (di, si, bp, sp))
+                print("    AX = 0x%x BX = 0x%x CX = 0x%x DX = 0x%x" % (ax, bx,
+                                                                       cx, dx))
+                print("    DI = 0x%x SI = 0x%x BP = 0x%x SP = 0x%x" % (di, si,
+                                                                       bp, sp))
                 print("    IP = 0x%x" % ip)
             elif self.mode == UC_MODE_32:
                 eax = uc.reg_read(UC_X86_REG_EAX)
@@ -211,8 +232,10 @@ class Emu(object):
                 eip = uc.reg_read(UC_X86_REG_EIP)
                 eflags = uc.reg_read(UC_X86_REG_EFLAGS)
 
-                print("    EAX = 0x%x EBX = 0x%x ECX = 0x%x EDX = 0x%x" % (eax, ebx, ecx, edx))
-                print("    EDI = 0x%x ESI = 0x%x EBP = 0x%x ESP = 0x%x" % (edi, esi, ebp, esp))
+                print("    EAX = 0x%x EBX = 0x%x ECX = 0x%x EDX = 0x%x" %
+                      (eax, ebx, ecx, edx))
+                print("    EDI = 0x%x ESI = 0x%x EBP = 0x%x ESP = 0x%x" %
+                      (edi, esi, ebp, esp))
                 print("    EIP = 0x%x" % eip)
             elif self.mode == UC_MODE_64:
                 rax = uc.reg_read(UC_X86_REG_RAX)
@@ -234,8 +257,10 @@ class Emu(object):
                 r15 = uc.reg_read(UC_X86_REG_R15)
                 eflags = uc.reg_read(UC_X86_REG_EFLAGS)
 
-                print("    RAX = 0x%x RBX = 0x%x RCX = 0x%x RDX = 0x%x" % (rax, rbx, rcx, rdx))
-                print("    RDI = 0x%x RSI = 0x%x RBP = 0x%x RSP = 0x%x" % (rdi, rsi, rbp, rsp))
+                print("    RAX = 0x%x RBX = 0x%x RCX = 0x%x RDX = 0x%x" %
+                      (rax, rbx, rcx, rdx))
+                print("    RDI = 0x%x RSI = 0x%x RBP = 0x%x RSP = 0x%x" %
+                      (rdi, rsi, rbp, rsp))
                 print("    R8 = 0x%x R9 = 0x%x R10 = 0x%x R11 = 0x%x R12 = 0x%x " \
                       "R13 = 0x%x R14 = 0x%x R15 = 0x%x" % (r8, r9, r10, r11, r12, r13, r14, r15))
                 print("    RIP = 0x%x" % rip)
@@ -267,7 +292,8 @@ class Emu(object):
         for address, data, init in self.data:
             addr = self._alignAddr(address)
             size = PAGE_ALIGN
-            while size < len(data): size += PAGE_ALIGN
+            while size < len(data):
+                size += PAGE_ALIGN
             uc.mem_map(addr, size)
             if init: uc.mem_write(addr, self._getOriginData(addr, size))
             uc.mem_write(address, data)
@@ -292,7 +318,8 @@ class Emu(object):
 
             # add the trace hook
             if self.traceOption & (TRACE_DATA_READ | TRACE_DATA_WRITE):
-                uc.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, self._hook_mem_access)
+                uc.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE,
+                            self._hook_mem_access)
             uc.hook_add(UC_HOOK_CODE, self._hook_code)
 
             # start emulate
@@ -337,6 +364,7 @@ class Emu(object):
             data = self.curUC.mem_read(addr + i * dataSize, dataSize)
             if count > 1: print('    ', end='')
             st = unpack_from(fmt, data)
+            print(st)
             if count > 1: print(',')
         print(']') if count > 1 else print('')
 
@@ -379,5 +407,10 @@ class Emu(object):
         self._showRegs(self.curUC)
 
     def eUntilAddress(self, startAddr, stopAddr, args=[], TimeOut=0, Count=0):
-        self._emulate(startAddr=startAddr, stopAddr=stopAddr, args=args, TimeOut=TimeOut, Count=Count)
+        self._emulate(
+            startAddr=startAddr,
+            stopAddr=stopAddr,
+            args=args,
+            TimeOut=TimeOut,
+            Count=Count)
         self._showRegs(self.curUC)
